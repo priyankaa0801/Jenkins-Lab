@@ -1,60 +1,43 @@
 pipeline {
     agent any
+
     environment {
-        DOCKER_CREDS = credentials('docker-hub-credentials')
-        IMAGE_NAME = "priyankaa0801/registration-form"
-        IMAGE_TAG = "latest"
+        // Adds the Windows Docker executable folder to the PATH for this build
+        PATH = "C:\\Program Files\\Docker\\Docker\\resources\\bin;${env.PATH}"
     }
+
     stages {
         stage('Checkout') {
             steps {
-                echo "Checking out source code..."
                 checkout scm
             }
         }
+
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker Image..."
-                bat "docker build -t %IMAGE_NAME%:%IMAGE_TAG% ."
+                bat 'docker build -t priyankaa0801/registration-form:latest .'
             }
         }
-        stage('Docker Login') {
+
+        stage('Push to Docker Hub') {
             steps {
-                echo "Logging in to Docker Hub..."
-                bat "docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD%"
-            }
-        }
-        stage('Push Docker Image to Docker Hub') {
-            steps {
-                echo "Pushing Docker Image to Docker Hub..."
-                bat "docker push %IMAGE_NAME%:%IMAGE_TAG%"
-            }
-        }
-        stage('Deploy to Kubernetes') {
-            steps {
-                echo "Deploying application to Kubernetes..."
-                bat "kubectl apply -f deployment.yaml --validate=false"
-                bat "kubectl apply -f service.yaml"
-            }
-        }
-        stage('Verify Kubernetes Deployment') {
-            steps {
-                echo "Checking Kubernetes resources..."
-                bat "kubectl get deployments"
-                bat "kubectl get pods"
-                bat "kubectl get services"
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    bat 'docker login -u %DOCKER_USER% -p %DOCKER_PASS%'
+                    bat 'docker push priyankaa0801/registration-form:latest'
+                }
             }
         }
     }
+
     post {
+        always {
+            echo 'Pipeline execution complete.'
+        }
         success {
-            echo "PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "Docker Image: %IMAGE_NAME%:%IMAGE_TAG%"
-            echo "Kubernetes deployment completed successfully!"
+            echo 'PIPELINE SUCCESSFUL!'
         }
         failure {
-            echo "PIPELINE FAILED!"
-            echo "Please check the Jenkins console output."
+            echo 'PIPELINE FAILED! Please check the Jenkins console output.'
         }
     }
 }
